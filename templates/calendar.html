@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Track Your Progress</title>
+    <link href='https://cdn.jsdelivr.net/npm/fullcalendar@5.10.1/main.min.css' rel='stylesheet' />
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            background-color: #f0f8ff;
+        }
+        .container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            text-align: center;
+        }
+        #calendar {
+            max-width: 100%;
+            width: 90%;
+            margin: 40px auto;
+            background-color: #fff;
+            padding: 15px;
+            border-radius: 10px;
+            box-shadow: 0px 0px 15px rgba(0, 0, 0, 0.1);
+        }
+        .modal {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 400px;
+            background-color: white;
+            box-shadow: 0px 0px 10px rgba(0, 0, 0, 0.1);
+            border-radius: 10px;
+            padding: 20px;
+            z-index: 1000;
+        }
+        .modal.active {
+            display: block;
+        }
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        .modal-header h3 {
+            margin: 0;
+            font-size: 18px;
+        }
+        .close-btn {
+            cursor: pointer;
+            background-color: #ff4444;
+            color: white;
+            padding: 5px 10px;
+            border-radius: 5px;
+            font-weight: bold;
+        }
+        .meal-input {
+            display: flex;
+            align-items: center;
+            margin-bottom: 10px;
+            white-space: nowrap;
+        }
+        .meal-input label {
+            flex: 1;
+            margin-right: 10px;
+        }
+        .meal-input input[type="text"] {
+            flex: 2;
+            margin-right: 10px;
+            width: 100px;
+        }
+        .meal-input input[type="number"] {
+            flex: 1;
+            margin-right: 10px;
+            width: 70px;
+        }
+        .remove-meal-btn {
+            background-color: #dc3545;
+            color: white;
+            padding: 5px 10px;
+            border-radius: 5px;
+            cursor: pointer;
+            border: none;
+            font-size: 14px;
+        }
+        .add-meal-btn {
+            background-color: #28a745;
+            color: white;
+            padding: 10px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin-bottom: 10px;
+            border: none;
+            width: 100%;
+        }
+        .save-btn {
+            background-color: #007bff;
+            color: white;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin-top: 10px;
+            width: 100%;
+            border: none;
+            text-align: center;
+        }
+        .file-upload-container {
+            display: flex;
+            justify-content: center;
+            margin-bottom: 15px;
+        }
+        .file-upload-btn {
+            background-color: #007bff;
+            color: white;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            border: none;
+            text-align: center;
+            font-weight: bold;
+        }
+        .file-upload-btn input {
+            display: none;
+        }
+        .go-back-btn {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background-color: #007bff;
+            color: white;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            border: none;
+            text-align: center;
+            font-weight: bold;
+            text-decoration: none;
+        }
+        .go-back-btn:hover {
+            background-color: #0056b3;
+        }
+        #totalCalories {
+            margin-top: 15px;
+            font-size: 18px;
+            font-weight: bold;
+            color: #333;
+        }
+        #uploadedImage {
+            margin-top: 15px;
+            max-width: 100%;
+            border-radius: 5px;
+            max-height: 200px;
+            object-fit: cover;
+        }
+        .fc-day-selected {
+            border: 2px solid black;
+            background-color: #ffeb3b;
+        }
+    </style>
+</head>
+<body>
+
+    <a href="/" class="go-back-btn">Go Back</a>
+
+    <div class="container">
+        <h2>Track Your Progress</h2>
+        <div id='calendar'></div>
+        <div id="calorieInfo" class="calorie-info"></div>
+    </div>
+
+    <div class="modal" id="trackerModal">
+        <div class="modal-header">
+            <h3>Calorie Tracker - Day <span id="modalDay">1</span></h3>
+            <span class="close-btn" onclick="closeModal()">X</span>
+        </div>
+        
+        <div class="file-upload-container">
+            <label class="file-upload-btn">
+                Upload Progress Photo
+                <input type="file" id="progressPhoto" accept="image/*" onchange="previewImage(event)">
+            </label>
+        </div>
+
+        <div id="mealContainer"></div>
+        <button class="add-meal-btn" onclick="addMeal()">Add Meal</button>
+
+        <div id="totalCalories">Total Calories: 0</div>
+        <img id="uploadedImage" style="display:none;" />
+
+        <button class="save-btn" onclick="saveData()">Save</button>
+    </div>
+
+    <script src='https://cdn.jsdelivr.net/npm/fullcalendar@5.10.1/main.min.js'></script>
+    <script>
+        const calorieData = {};
+        const mealData = {};
+        const imageData = {};
+
+        document.addEventListener('DOMContentLoaded', function() {
+            var calendarEl = document.getElementById('calendar');
+            var calorieInfoEl = document.getElementById('calorieInfo');
+            var calendar = new FullCalendar.Calendar(calendarEl, {
+                initialView: 'dayGridMonth',
+                dateClick: function(info) {
+                    openModal(info.dateStr);
+                    highlightSelectedDay(info.dateStr);
+                    const calories = calorieData[info.dateStr] || 0;
+                    calorieInfoEl.innerText = `Total Calories for ${info.dateStr}: ${calories} kcal`;
+                },
+            });
+            calendar.render();
+        });
+
+        function highlightSelectedDay(dateStr) {
+            const prevSelected = document.querySelector('.fc-day-selected');
+            if (prevSelected) {
+                prevSelected.classList.remove('fc-day-selected');
+            }
+
+            const selectedDay = document.querySelector(`[data-date="${dateStr}"]`);
+            if (selectedDay) {
+                selectedDay.classList.add('fc-day-selected');
+            }
+        }
+
+        function openModal(date) {
+            document.getElementById('modalDay').innerText = date;
+            loadMealInputs(date);
+            const totalCalories = calorieData[date] || 0;
+            document.getElementById('totalCalories').innerText = `Total Calories: ${totalCalories}`;
+            const uploadedImage = imageData[date];
+            if (uploadedImage) {
+                document.getElementById('uploadedImage').src = uploadedImage;
+                document.getElementById('uploadedImage').style.display = 'block';
+            } else {
+                document.getElementById('uploadedImage').style.display = 'none';
+            }
+            document.getElementById('trackerModal').classList.add('active');
+        }
+
+        function closeModal() {
+            document.getElementById('trackerModal').classList.remove('active');
+        }
+
+        function addMeal(mealName = '', mealCalories = '') {
+            const mealContainer = document.getElementById('mealContainer');
+            const mealCount = mealContainer.children.length + 1;
+            const mealDiv = document.createElement('div');
+            mealDiv.className = 'meal-input';
+            mealDiv.innerHTML = `
+                <label for="meal${mealCount}">Meal ${mealCount}:</label>
+                <input type="text" id="mealName${mealCount}" name="mealName${mealCount}" placeholder="Name" value="${mealName}">
+                <input type="number" id="mealCalories${mealCount}" name="mealCalories${mealCount}" placeholder="Calories" value="${mealCalories}" oninput="updateTotalCalories()">
+                <button class="remove-meal-btn" onclick="removeMeal(this)">Remove</button>
+            `;
+            mealContainer.appendChild(mealDiv);
+            updateTotalCalories();
+        }
+
+        function removeMeal(button) {
+            button.parentElement.remove();
+            updateTotalCalories();
+        }
+
+        function updateTotalCalories() {
+            let totalCalories = 0;
+            const mealInputs = document.querySelectorAll('#mealContainer .meal-input input[type="number"]');
+            mealInputs.forEach(input => {
+                if (input.value) {
+                    totalCalories += parseInt(input.value);
+                }
+            });
+            document.getElementById('totalCalories').innerText = `Total Calories: ${totalCalories}`;
+        }
+
+        function saveData() {
+            const date = document.getElementById('modalDay').innerText;
+            const mealInputs = document.querySelectorAll('#mealContainer .meal-input');
+            let totalCalories = 0;
+            const meals = [];
+
+            mealInputs.forEach(mealDiv => {
+                const nameInput = mealDiv.querySelector('input[type="text"]').value;
+                const calorieInput = mealDiv.querySelector('input[type="number"]').value;
+                if (calorieInput) {
+                    const calories = parseInt(calorieInput);
+                    totalCalories += calories;
+                    meals.push({ name: nameInput, calories });
+                }
+            });
+
+            calorieData[date] = totalCalories;
+            mealData[date] = meals;
+
+            const imageFile = document.getElementById('progressPhoto').files[0];
+            if (imageFile) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    imageData[date] = e.target.result;
+                };
+                reader.readAsDataURL(imageFile);
+            }
+
+            document.getElementById('calorieInfo').innerText = `Total Calories for ${date}: ${totalCalories} kcal`;
+
+            closeModal();
+        }
+
+        function loadMealInputs(date) {
+            const meals = mealData[date];
+            const mealContainer = document.getElementById('mealContainer');
+            mealContainer.innerHTML = '';
+
+            if (meals && meals.length > 0) {
+                meals.forEach(meal => addMeal(meal.name, meal.calories));
+            } else {
+                addMeal();
+            }
+            updateTotalCalories();
+        }
+
+        function previewImage(event) {
+            const reader = new FileReader();
+            reader.onload = function() {
+                const output = document.getElementById('uploadedImage');
+                output.src = reader.result;
+                output.style.display = 'block';
+            };
+            reader.readAsDataURL(event.target.files[0]);
+        }
+    </script>
+
+</body>
+</html>
